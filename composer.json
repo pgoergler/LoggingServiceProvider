@@ -15,7 +15,7 @@
     "require": {
         "php": ">=5.3.0",
         "logging/logging": "dev-master",
-        "silex/silex": "dev-master",
+        "silex/silex": "dev-master"
     },
     "autoload": {
         "psr-0": {
