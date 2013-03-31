@@ -44,7 +44,7 @@ class LoggingServiceProvider implements ServiceProviderInterface
         $app['logger.factory'] = $app->share(function() use(&$app)
                 {
                     $factory = \Logging\LoggersManager::getInstance();
-                    if( $app->offsetExists('logger.class'))
+                    if ($app->offsetExists('logger.class'))
                     {
                         $factory->setLoggerClass($app['logger.class']);
                     }
@@ -71,5 +71,29 @@ class LoggingServiceProvider implements ServiceProviderInterface
 
 class Logger extends \Logging\Logger implements \Symfony\Component\HttpKernel\Log\LoggerInterface
 {
+
+    public function crit($message, array $context = array())
+    {
+        $context['debug_backtrace'] = debug_backtrace();
+        $this->critical($message, $context);
+    }
+
+    public function emerg($message, array $context = array())
+    {
+        $context['debug_backtrace'] = debug_backtrace();
+        $this->emergency($message, $context);
+    }
+
+    public function err($message, array $context = array())
+    {
+        $context['debug_backtrace'] = debug_backtrace();
+        $this->error($message, $context);
+    }
+
+    public function warn($message, array $context = array())
+    {
+        $context['debug_backtrace'] = debug_backtrace();
+        $this->warning($message, $context);
+    }
 
 }
