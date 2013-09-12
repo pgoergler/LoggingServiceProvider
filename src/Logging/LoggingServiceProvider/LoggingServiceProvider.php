@@ -15,23 +15,13 @@ class LoggingServiceProvider implements ServiceProviderInterface
 
     public function boot(Application $app)
     {
-        $dirs = array(
-            'root' => __W_ROOT_DIR,
-            'apps' => __W_APPS_DIR,
-            'config' => __W_CONFIG_DIR,
-            'data' => __W_DATA_DIR,
-            'upload' => __W_UPLOAD_DIR,
-            'vendor' => __W_VENDOR_DIR,
-            'log' => __W_LOG_DIR,
-            'web' => __W_WEB_DIR,
-            'css' => __W_CSS_DIR,
-            'js' => __W_JS_DIR,
-            'img' => __W_IMG_DIR,
-        );
-
-        foreach ($dirs as $dir => $value)
+        if( $app->offsetExists('logger.directory') )
         {
-            $app['logger.factory']->set('dir_' . $dir, $value);
+            $app['logger.factory']->set('dir_log', $app['logger.directory']);
+        }
+        else
+        {
+            $app['logger.factory']->set('dir_log', './');
         }
 
         $app['logger.factory']->configure($app['ongoo.loggers']);
