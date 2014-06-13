@@ -55,6 +55,18 @@ class LoggingServiceProvider implements ServiceProviderInterface
                     $app['logger']->error("Error catcher has catch:");
                     $app['logger']->error($e);
                 });
+
+        $app['logger.interpolate'] = $app->protect(function($message, $context = array()) use(&$app) {
+            return $app['logger.factory']->interpolate($message, $context);
+        });
+        
+        $app['logger.flattern'] = $app->protect(function($item, $level) use(&$app) {
+            return $app['logger.factory']->flattern($item, $level);
+        });
+        
+        $app['logger.prettydump'] = $app->protect(function($variable, $context = array()) use(&$app) {
+            return $app['logger.factory']->prettydump($variable, $context);
+        });
     }
 
 }
