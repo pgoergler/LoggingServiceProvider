@@ -71,31 +71,34 @@ class LoggingServiceProvider implements ServiceProviderInterface
 
 }
 
-class Logger extends \Logging\Logger implements \Symfony\Component\HttpKernel\Log\LoggerInterface
+if( class_exists('\Symfony\Component\HttpKernel\Log\LoggerInterface') )
 {
-
-    public function crit($message, array $context = array())
+    class Logger extends \Logging\Logger implements \Symfony\Component\HttpKernel\Log\LoggerInterface
     {
-        $context['debug_backtrace'] = debug_backtrace();
-        $this->critical($message, $context);
-    }
 
-    public function emerg($message, array $context = array())
-    {
-        $context['debug_backtrace'] = debug_backtrace();
-        $this->emergency($message, $context);
-    }
+        public function crit($message, array $context = array())
+        {
+            $context['debug_backtrace'] = debug_backtrace();
+            $this->critical($message, $context);
+        }
 
-    public function err($message, array $context = array())
-    {
-        $context['debug_backtrace'] = debug_backtrace();
-        $this->error($message, $context);
-    }
+        public function emerg($message, array $context = array())
+        {
+            $context['debug_backtrace'] = debug_backtrace();
+            $this->emergency($message, $context);
+        }
 
-    public function warn($message, array $context = array())
-    {
-        $context['debug_backtrace'] = debug_backtrace();
-        $this->warning($message, $context);
-    }
+        public function err($message, array $context = array())
+        {
+            $context['debug_backtrace'] = debug_backtrace();
+            $this->error($message, $context);
+        }
 
+        public function warn($message, array $context = array())
+        {
+            $context['debug_backtrace'] = debug_backtrace();
+            $this->warning($message, $context);
+        }
+
+    }
 }
