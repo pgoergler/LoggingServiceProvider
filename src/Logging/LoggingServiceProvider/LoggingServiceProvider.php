@@ -41,20 +41,18 @@ class LoggingServiceProvider implements ServiceProviderInterface
                     return $factory;
                 });
 
-        $app->error(function (\Exception $e, $code) use(&$app)
+        if( !$app->offsetExists('logger.exception_handler'))
+        {
+            $app['logger.exception_handler'] = $app->protect(function (\Exception $e, $code) use(&$app)
                 {
-                    switch ($code)
-                    {
-                        case 404:
-                            $message = 'The requested page could not be found.';
-                            break;
-                        default:
-                            $message = 'We are sorry, but something went terribly wrong.';
-                    }
-
                     $app['logger']->error("Error catcher has catch:");
                     $app['logger']->error($e);
                 });
+        }
+        
+        $app->error(function (\Exception $e, $code) use(&$app){
+            $app['logger.exception_handler']($e, $code);
+        });
 
         $app['logger.interpolate'] = $app->protect(function($message, $context = array()) use(&$app) {
             return $app['logger.factory']->interpolate($message, $context);
