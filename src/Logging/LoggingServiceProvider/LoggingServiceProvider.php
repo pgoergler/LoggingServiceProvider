@@ -15,11 +15,10 @@ class LoggingServiceProvider implements ServiceProviderInterface
 
     public function boot(Application $app)
     {
-        if( $app->offsetExists('logger.directory') )
+        if ($app->offsetExists('logger.directory'))
         {
             $app['logger.factory']->set('dir_log', $app['logger.directory']);
-        }
-        else
+        } else
         {
             $app['logger.factory']->set('dir_log', './');
         }
@@ -27,14 +26,14 @@ class LoggingServiceProvider implements ServiceProviderInterface
         $app['logger.factory']->configure($app['ongoo.loggers']);
         $root = $app['logger.factory']->get('root');
         $app['logger'] = $root;
-        
+
         if ($app->offsetExists('logger') && $app['logger'] !== null)
         {
             if ($app->offsetExists('error_handler') && $app['error_handler'] !== null)
             {
                 set_error_handler($app['error_handler']);
             }
-            
+
             if ($app->offsetExists('shutdown_handler'))
             {
                 register_shutdown_function($app['shutdown_handler']);
@@ -45,111 +44,120 @@ class LoggingServiceProvider implements ServiceProviderInterface
     public function register(Application $app)
     {
         $app['logger.factory'] = $app->share(function() use(&$app)
-                {
-                    $factory = \Logging\LoggersManager::getInstance();
-                    if ($app->offsetExists('logger.class'))
-                    {
-                        $factory->setLoggerClass($app['logger.class']);
-                    }
-                    return $factory;
-                });
+        {
+            $factory = \Logging\LoggersManager::getInstance();
+            if ($app->offsetExists('logger.class'))
+            {
+                $factory->setLoggerClass($app['logger.class']);
+            }
+            return $factory;
+        });
 
-        if( !$app->offsetExists('logger.exception_handler'))
+        if (!$app->offsetExists('logger.exception_handler'))
         {
             $app['logger.exception_handler'] = $app->protect(function (\Exception $e, $code) use(&$app)
-                {
-                    $app['logger']->error("Error catcher has catch:");
-                    $app['logger']->error($e);
-                });
+            {
+                $app['logger']->error("Error catcher has catch:");
+                $app['logger']->error($e);
+            });
         }
-        
-        $app->error(function (\Exception $e, $code) use(&$app){
+
+        $app->error(function (\Exception $e, $code) use(&$app)
+        {
             $app['logger.exception_handler']($e, $code);
         });
 
-        $app['logger.interpolate'] = $app->protect(function($message, $context = array()) use(&$app) {
+        $app['logger.interpolate'] = $app->protect(function($message, $context = array()) use(&$app)
+        {
             return $app['logger.factory']->interpolate($message, $context);
         });
-        
-        $app['logger.flattern'] = $app->protect(function($item, $level) use(&$app) {
-            return $app['logger.factory']->flattern($item, $level);
-        });
-        
-        $app['logger.prettydump'] = $app->protect(function($variable, $context = array()) use(&$app) {
+
+        $app['logger.prettydump'] = $app->protect(function($variable, $context = array()) use(&$app)
+        {
             return $app['logger.factory']->prettydump($variable, $context);
         });
-        
+
         if (!$app->offsetExists('error_handler'))
         {
-            $app['error_handler'] = $app->protect(function($errno, $errstr, $errfile, $errline) use(&$app)
+            $app['error_handler'] = $app->protect(function($errno, $errstr, $errfile, $errline, $errcontext) use(&$app, $defaultErrorHandler)
             {
                 if (!(error_reporting() & $errno))
                 {
                     // This error code is not included in error_reporting
                     return;
                 }
-                
+
+
+                if (!isset($errcontext['debug_backtrace']))
+                {
+                    $stack = debug_backtrace();
+                    \array_shift($stack);
+                    $context = array(
+                        0 => $errcontext,
+                        'debug_backtrace' => $stack
+                    );
+                } else
+                {
+                    $context = $errcontext;
+                }
+
                 $errDescription = implode('|', $app['errno_converter']($errno));
 
+                $logLevel = 'critical';
                 switch ($errno)
                 {
                     case E_ERROR:
                     case E_USER_ERROR:
-                        $app['logger']->error("[$errno][$errDescription] In $errfile at $errline");
-                        $app['logger']->error("[$errno][$errDescription] $errstr");
+                        $logLevel = 'error';
                         break;
                     case E_NOTICE:
                     case E_USER_NOTICE:
-                        $app['logger']->notice("[$errno][$errDescription] In $errfile at $errline");
-                        $app['logger']->notice("[$errno][$errDescription] $errstr");
+                        $logLevel = 'notice';
                         break;
                     case E_WARNING:
                     case E_USER_WARNING:
-                        $app['logger']->warning("[$errno][$errDescription] In $errfile at $errline");
-                        $app['logger']->warning("[$errno][$errDescription] $errstr");
+                        $logLevel = 'warning';
                         break;
                     case E_DEPRECATED:
-                        $app['logger']->info("[DEPRECATED] In $errfile at $errline");
-                        $app['logger']->info("[DEPRECATED] $errstr");
+                        $logLevel = 'info';
                         break;
                     case E_STRICT:
-                        $app['logger']->alert("[STRICT] In $errfile at $errline");
-                        $app['logger']->alert("[STRICT] $errstr");
-                        break;
-                    default:
-                        $app['logger']->critical("[$errno][$errDescription] In $errfile at $errline");
-                        $app['logger']->critical("[$errno][$errDescription] $errstr");
+                        $logLevel = 'alert';
                         break;
                 }
+                $app['logger']->$logLevel("[$errDescription($errno)] +-", $context);
+                $app['logger']->$logLevel("[$errDescription($errno)] | context: {}", $context);
+                $app['logger']->$logLevel("[$errDescription($errno)] | message: $errstr", $context);
+                $app['logger']->$logLevel("[$errDescription($errno)] +-", $context);
             });
         }
-        
-        if( !$app->offsetExists('errno_converter'))
+
+        if (!$app->offsetExists('errno_converter'))
         {
             $app['errno_converter'] = $app->protect(function($errno) use(&$app)
             {
                 $error_description = array();
                 $error_codes = array(
-                    E_ERROR              => "E_ERROR",
-                    E_WARNING            => "E_WARNING",
-                    E_PARSE              => "E_PARSE",
-                    E_NOTICE             => "E_NOTICE",
-                    E_CORE_ERROR         => "E_CORE_ERROR",
-                    E_CORE_WARNING       => "E_CORE_WARNING",
-                    E_COMPILE_ERROR      => "E_COMPILE_ERROR",
-                    E_COMPILE_WARNING    => "E_COMPILE_WARNING",
-                    E_USER_ERROR         => "E_USER_ERROR",
-                    E_USER_WARNING       => "E_USER_WARNING",
-                    E_USER_NOTICE        => "E_USER_NOTICE",
-                    E_STRICT             => "E_STRICT",
-                    E_RECOVERABLE_ERROR  => "E_RECOVERABLE_ERROR",
-                    E_DEPRECATED         => "E_DEPRECATED",
-                    E_USER_DEPRECATED    => "E_USER_DEPRECATED",
-                    E_ALL                => "E_ALL"
+                    E_ERROR => "E_ERROR",
+                    E_WARNING => "E_WARNING",
+                    E_PARSE => "E_PARSE",
+                    E_NOTICE => "E_NOTICE",
+                    E_CORE_ERROR => "E_CORE_ERROR",
+                    E_CORE_WARNING => "E_CORE_WARNING",
+                    E_COMPILE_ERROR => "E_COMPILE_ERROR",
+                    E_COMPILE_WARNING => "E_COMPILE_WARNING",
+                    E_USER_ERROR => "E_USER_ERROR",
+                    E_USER_WARNING => "E_USER_WARNING",
+                    E_USER_NOTICE => "E_USER_NOTICE",
+                    E_STRICT => "E_STRICT",
+                    E_RECOVERABLE_ERROR => "E_RECOVERABLE_ERROR",
+                    E_DEPRECATED => "E_DEPRECATED",
+                    E_USER_DEPRECATED => "E_USER_DEPRECATED",
+                    E_ALL => "E_ALL"
                 );
-                foreach( $error_codes as $number => $description )
+                foreach ($error_codes as $number => $description)
                 {
-                    if ( ( $number & $errno ) == $number )
+                    if (( $number & $errno ) == $number)
                     {
                         $error_description[] = $description;
                     }
@@ -157,31 +165,41 @@ class LoggingServiceProvider implements ServiceProviderInterface
                 return $error_description;
             });
         }
-        
+
         if (!$app->offsetExists('shutdown_handler'))
         {
             $app['shutdown_handler'] = $app->protect(function() use(&$app)
             {
                 $error = error_get_last();
-                if( $error === null )
+                if ($error === null)
                 {
                     return;
                 }
-                
+
                 $errno = $error['type'];
                 $errfile = $error['file'];
                 $errline = $error['line'];
                 $errstr = $error['message'];
-                
-                $app['error_handler']($errno, $errstr, $errfile, $errline);
+
+                $context = array(
+                    'debug_backtrace' => array(
+                        array(
+                            'file' => $errfile,
+                            'line' => $errline,
+                        )
+                    )
+                );
+
+                $app['error_handler']($errno, $errstr, $errfile, $errline, $context);
             });
         }
     }
 
 }
 
-if( class_exists('\Symfony\Component\HttpKernel\Log\LoggerInterface') )
+if (class_exists('\Symfony\Component\HttpKernel\Log\LoggerInterface'))
 {
+
     class Logger extends \Logging\Logger implements \Symfony\Component\HttpKernel\Log\LoggerInterface
     {
 
@@ -210,4 +228,5 @@ if( class_exists('\Symfony\Component\HttpKernel\Log\LoggerInterface') )
         }
 
     }
+
 }
