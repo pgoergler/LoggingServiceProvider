@@ -79,7 +79,7 @@ class LoggingServiceProvider implements ServiceProviderInterface
 
         if (!$app->offsetExists('error_handler'))
         {
-            $app['error_handler'] = $app->protect(function($errno, $errstr, $errfile, $errline, $errcontext) use(&$app, $defaultErrorHandler)
+            $app['error_handler'] = $app->protect(function($errno, $errstr, $errfile, $errline, $errcontext) use(&$app)
             {
                 if (!(error_reporting() & $errno))
                 {
