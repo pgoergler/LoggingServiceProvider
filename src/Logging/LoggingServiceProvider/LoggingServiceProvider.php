@@ -27,6 +27,19 @@ class LoggingServiceProvider implements ServiceProviderInterface
         $app['logger.factory']->configure($app['ongoo.loggers']);
         $root = $app['logger.factory']->get('root');
         $app['logger'] = $root;
+        
+        if ($app->offsetExists('logger') && $app['logger'] !== null)
+        {
+            if ($app->offsetExists('error_handler') && $app['error_handler'] !== null)
+            {
+                set_error_handler($app['error_handler']);
+            }
+            
+            if ($app->offsetExists('shutdown_handler'))
+            {
+                register_shutdown_function($app['shutdown_handler']);
+            }
+        }
     }
 
     public function register(Application $app)
@@ -65,6 +78,104 @@ class LoggingServiceProvider implements ServiceProviderInterface
         $app['logger.prettydump'] = $app->protect(function($variable, $context = array()) use(&$app) {
             return $app['logger.factory']->prettydump($variable, $context);
         });
+        
+        if (!$app->offsetExists('error_handler'))
+        {
+            $app['error_handler'] = $app->protect(function($errno, $errstr, $errfile, $errline) use(&$app)
+            {
+                if (!(error_reporting() & $errno))
+                {
+                    // This error code is not included in error_reporting
+                    return;
+                }
+                
+                $errDescription = implode('|', $app['errno_converter']($errno));
+
+                switch ($errno)
+                {
+                    case E_ERROR:
+                    case E_USER_ERROR:
+                        $app['logger']->error("[$errno][$errDescription] In $errfile at $errline");
+                        $app['logger']->error("[$errno][$errDescription] $errstr");
+                        break;
+                    case E_NOTICE:
+                    case E_USER_NOTICE:
+                        $app['logger']->notice("[$errno][$errDescription] In $errfile at $errline");
+                        $app['logger']->notice("[$errno][$errDescription] $errstr");
+                        break;
+                    case E_WARNING:
+                    case E_USER_WARNING:
+                        $app['logger']->warning("[$errno][$errDescription] In $errfile at $errline");
+                        $app['logger']->warning("[$errno][$errDescription] $errstr");
+                        break;
+                    case E_DEPRECATED:
+                        $app['logger']->info("[DEPRECATED] In $errfile at $errline");
+                        $app['logger']->info("[DEPRECATED] $errstr");
+                        break;
+                    case E_STRICT:
+                        $app['logger']->alert("[STRICT] In $errfile at $errline");
+                        $app['logger']->alert("[STRICT] $errstr");
+                        break;
+                    default:
+                        $app['logger']->critical("[$errno][$errDescription] In $errfile at $errline");
+                        $app['logger']->critical("[$errno][$errDescription] $errstr");
+                        break;
+                }
+            });
+        }
+        
+        if( !$app->offsetExists('errno_converter'))
+        {
+            $app['errno_converter'] = $app->protect(function($errno) use(&$app)
+            {
+                $error_description = array();
+                $error_codes = array(
+                    E_ERROR              => "E_ERROR",
+                    E_WARNING            => "E_WARNING",
+                    E_PARSE              => "E_PARSE",
+                    E_NOTICE             => "E_NOTICE",
+                    E_CORE_ERROR         => "E_CORE_ERROR",
+                    E_CORE_WARNING       => "E_CORE_WARNING",
+                    E_COMPILE_ERROR      => "E_COMPILE_ERROR",
+                    E_COMPILE_WARNING    => "E_COMPILE_WARNING",
+                    E_USER_ERROR         => "E_USER_ERROR",
+                    E_USER_WARNING       => "E_USER_WARNING",
+                    E_USER_NOTICE        => "E_USER_NOTICE",
+                    E_STRICT             => "E_STRICT",
+                    E_RECOVERABLE_ERROR  => "E_RECOVERABLE_ERROR",
+                    E_DEPRECATED         => "E_DEPRECATED",
+                    E_USER_DEPRECATED    => "E_USER_DEPRECATED",
+                    E_ALL                => "E_ALL"
+                );
+                foreach( $error_codes as $number => $description )
+                {
+                    if ( ( $number & $errno ) == $number )
+                    {
+                        $error_description[] = $description;
+                    }
+                }
+                return $error_description;
+            });
+        }
+        
+        if (!$app->offsetExists('shutdown_handler'))
+        {
+            $app['shutdown_handler'] = $app->protect(function() use(&$app)
+            {
+                $error = error_get_last();
+                if( $error === null )
+                {
+                    return;
+                }
+                
+                $errno = $error['type'];
+                $errfile = $error['file'];
+                $errline = $error['line'];
+                $errstr = $error['message'];
+                
+                $app['error_handler']($errno, $errstr, $errfile, $errline);
+            });
+        }
     }
 
 }
