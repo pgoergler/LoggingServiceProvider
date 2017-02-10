@@ -24,8 +24,6 @@ class LoggingServiceProvider implements ServiceProviderInterface
         }
 
         $app['logger.factory']->configure($app['ongoo.loggers']);
-        $root = $app['logger.factory']->get('root');
-        $app['logger'] = $root;
 
         if ($app->offsetExists('logger') && $app['logger'] !== null)
         {
@@ -52,6 +50,23 @@ class LoggingServiceProvider implements ServiceProviderInterface
             }
             return $factory;
         });
+        
+        $app['logger'] = function() use(&$app){
+            return $app['logger.factory']->get('root');
+        };
+        
+        if (!$app->OffsetExists('request.logger.change'))
+        {
+            $app['request.logger.change'] = $app->protect(function($loggerName) use (&$app)
+            {
+                return function(\Symfony\Component\HttpFoundation\Request $request) use (&$app, $loggerName)
+                {
+                    $root = $app['logger.factory']->get($loggerName);
+                    $app['logger.factory']->add($root, 'root');
+                    $app['logger'] = $root;
+                };
+            });
+        }
 
         if (!$app->offsetExists('logger.exception_handler'))
         {
