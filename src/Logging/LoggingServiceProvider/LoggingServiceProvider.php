@@ -140,10 +140,7 @@ class LoggingServiceProvider implements ServiceProviderInterface
                         $logLevel = 'alert';
                         break;
                 }
-                $app['logger']->$logLevel("[$errDescription($errno)] +-", $context);
-                $app['logger']->$logLevel("[$errDescription($errno)] | context: {}", $context);
-                $app['logger']->$logLevel("[$errDescription($errno)] | message: $errstr", $context);
-                $app['logger']->$logLevel("[$errDescription($errno)] +-", $context);
+                $app['logger']->$logLevel("[$errDescription($errno)] message: $errstr, context: {}", $context);
             });
         }
 
