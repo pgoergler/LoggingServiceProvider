@@ -30,6 +30,7 @@ class LoggingServiceProvider implements ServiceProviderInterface
             if ($app->offsetExists('error_handler') && $app['error_handler'] !== null)
             {
                 set_error_handler($app['error_handler']);
+                $app['logging.previous_exception_handler'] = set_exception_handler($app['logger.exception_handler']);
             }
 
             if ($app->offsetExists('shutdown_handler'))
@@ -68,16 +69,35 @@ class LoggingServiceProvider implements ServiceProviderInterface
             });
         }
 
-        if (!$app->offsetExists('logger.exception_handler'))
+        $previousHandler = null;
+        if ($app->offsetExists('logger.exception_handler'))
         {
-            $app['logger.exception_handler'] = $app->protect(function (\Exception $e, $code) use(&$app)
-            {
-                $app['logger']->error("Error catcher has catch:");
-                $app['logger']->error($e);
-            });
+            $previousHandler = $app['logger.exception_handler'];
         }
+        
+        $app['logger.exception_handler'] = $app->protect(function ($e, $code) use(&$app, &$previousHandler)
+        {
+            if( !is_null($previousHandler) )
+            {
+                try {
+                    call_user_func($previousHandler, $e, $code);
+                } catch (\Exception $handlerException) {
+                } catch (\Throwable $handlerException) {
+                }
+            }
+            if( $app->offsetExists('logging.previous_exception_handler') ) {
+                try {
+                    call_user_func($app['logging.previous_exception_handler'], $e, $code);
+                } catch (\Exception $handlerException) {
+                } catch (\Throwable $handlerException) {
+                }
+            }
 
-        $app->error(function (\Exception $e, $code) use(&$app)
+            $app['logger']->error("Error catcher has catch:");
+            $app['logger']->error($e);
+        });
+
+        $app->error(function ($e, $code) use(&$app)
         {
             $app['logger.exception_handler']($e, $code);
         });
