@@ -75,7 +75,7 @@ class LoggingServiceProvider implements ServiceProviderInterface
             $previousHandler = $app['logger.exception_handler'];
         }
         
-        $app['logger.exception_handler'] = $app->protect(function ($e, $code) use(&$app, &$previousHandler)
+        $app['logger.exception_handler'] = $app->protect(function ($e, $code = null) use(&$app, &$previousHandler)
         {
             if( !is_null($previousHandler) )
             {
